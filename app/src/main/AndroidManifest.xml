@@ -16,13 +16,13 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/avatar"
+        android:icon="@drawable/ic_launcher_custom"
         android:label="LQ Server Fixer"
         android:supportsRtl="true"
         android:theme="@style/Theme.LQServerFixer"
         tools:targetApi="34">
 
-        <!-- BẮT BUỘC PHẢI CÓ tools:replace -->
+        <!-- BẮT BUỘC PHẢI CÓ tools:replace để không bị lỗi xung đột Provider -->
         <meta-data
             android:name="moe.shizuku.client.V3_SUPPORT"
             android:value="true"
