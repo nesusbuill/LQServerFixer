@@ -22,11 +22,15 @@ class OptimizerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        val n = buildNotif("Đang khởi tạo...", 0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceCompat.startForeground(this, 1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else startForeground(1, n)
+        try {
+            createNotificationChannel()
+            val n = buildNotif("Đang khởi tạo...", 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceCompat.startForeground(this, 1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(1, n)
+            }
+        } catch (_: Exception) {}
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -38,14 +42,12 @@ class OptimizerService : Service() {
                 emit(10, "Đang kéo luật từ Server...")
                 val pathsToDelete = NetworkManager.fetchRules()
 
-                // BƯỚC 1: KHÓA FILE VERSION CHỐNG TẢI LẠI
                 emit(20, "Khóa file Version chống tải lại...")
                 sh("find $extDir -name '*version*' -exec chmod 444 {} \\; 2>/dev/null")
                 sh("find $extDir -name 'localhash' -exec chmod 444 {} \\; 2>/dev/null")
                 sh("find $extDir -name 'manifest*' -exec chmod 444 {} \\; 2>/dev/null")
                 delay(500)
 
-                // BƯỚC 2: TỰ ĐỘNG XÓA THEO LUẬT TỪ SERVER
                 var currentProgress = 30
                 val step = 55 / (if (pathsToDelete.isEmpty()) 1 else pathsToDelete.size)
 
@@ -56,16 +58,13 @@ class OptimizerService : Service() {
                     delay(100)
                 }
 
-                // BƯỚC 3: QUÉT SÂU FILE NẶNG CÒN SÓT
                 emit(85, "Quét xóa file Model nặng...")
                 sh("find $extDir/files -type f \\( -name '*.bundle' -o -name '*.assets' \\) -size +2M -delete 2>/dev/null")
 
-                // Dọn rác Shader Cache
                 sh("rm -rf $extDir/cache/* 2>/dev/null")
                 sh("rm -rf $dataDir/cache/* 2>/dev/null")
                 sh("find $dataDir -path '*cache*shader*' -delete 2>/dev/null")
 
-                // BƯỚC 4: KHỞI ĐỘNG LẠI GAME
                 emit(95, "Force-stop Liên Quân...")
                 sh("am force-stop $LQ_PKG")
                 delay(800)
