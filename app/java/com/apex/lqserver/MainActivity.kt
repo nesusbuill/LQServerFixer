@@ -28,17 +28,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 
-val BgDark = Color(0xFF141414)
-val CardBg = Color(0xFF1C1C1E)
+val BgDark    = Color(0xFF141414)
+val CardBg    = Color(0xFF1C1C1E)
 val PurpleBtn = Color(0xFFD0BCFF)
 val TextWhite = Color(0xFFEEEEEE)
-val TextGray = Color(0xFF888888)
-val RedColor = Color(0xFFFF5252)
+val TextGray  = Color(0xFF888888)
+val RedColor  = Color(0xFFFF5252)
 
 class MainActivity : ComponentActivity() {
     private val requestNotifPermission = registerForActivityResult(
@@ -47,14 +47,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            WindowInsetsControllerCompat(window, window.decorView).let {
-                it.hide(WindowInsetsCompat.Type.systemBars())
-                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } catch (_: Exception) {}
-
+        
+        // Không dùng WindowCompat để tránh lỗi trên một số dòng máy
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -72,6 +66,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun App() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var hasShizuku by remember { mutableStateOf(false) }
     var hasLQ by remember { mutableStateOf(false) }
     
@@ -79,19 +74,22 @@ fun App() {
     val progress by ProgressState.progress.collectAsState()
     val message by ProgressState.message.collectAsState()
 
+    // Đưa logic check Shizuku vào Background Thread để không block UI
     LaunchedEffect(Unit) {
-        try {
-            hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
-            val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
+        withContext(Dispatchers.IO) {
+            try {
+                hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
+                val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
 
-            hasShizuku = try {
-                if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
-            } catch (_: Throwable) { false }
+                hasShizuku = try {
+                    if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
+                } catch (_: Throwable) { false }
 
-            if (isShizukuInstalled && !hasShizuku) {
-                try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
-            }
-        } catch (_: Exception) {}
+                if (isShizukuInstalled && !hasShizuku) {
+                    try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun runOptimize() {
@@ -101,7 +99,9 @@ fun App() {
                 return
             }
             if (!hasShizuku) {
-                Shizuku.requestPermission(1001)
+                scope.launch(Dispatchers.IO) {
+                    try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
+                }
                 return
             }
             ProgressState.start()
