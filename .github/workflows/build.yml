@@ -24,9 +24,6 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Generate Release Keystore
         run: |
           keytool -genkeypair -v \
@@ -40,7 +37,8 @@ jobs:
             -dname "CN=LQServerFixer, OU=Dev, O=Apex, L=Hanoi, S=Hanoi, C=VN"
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
+        # Đã đổi từ ./gradlew thành gradle để không cần file gradlew
+        run: gradle assembleRelease --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
