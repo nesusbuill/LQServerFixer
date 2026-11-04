@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // CHỈ XIN QUYỀN THÔNG BÁO (Android 13+)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -164,7 +163,6 @@ fun App() {
             Text("$message ($progress%)", color = PurpleBtn, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), textAlign = TextAlign.Center)
         }
 
-        // Cảnh báo nếu thiếu quyền
         if (!hasShizuku || !hasLQ) {
             Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 if (!hasShizuku) {
