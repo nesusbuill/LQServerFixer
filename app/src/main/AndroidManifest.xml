@@ -15,9 +15,10 @@
         <package android:name="com.garena.game.kgvn" />
     </queries>
 
+    <!-- DÙNG THEME GỐC CỦA ANDROID ĐỂ CHỐNG VĂNG 100% -->
     <application
         android:label="LQ Server Fixer"
-        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
         android:allowBackup="false"
         tools:replace="android:theme">
 
