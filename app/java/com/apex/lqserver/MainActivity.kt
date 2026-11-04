@@ -47,17 +47,23 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).let {
-            it.hide(WindowInsetsCompat.Type.systemBars())
-            it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        
+        // Bọc try-catch chống văng màn hình
+        try {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowInsetsControllerCompat(window, window.decorView).let {
+                it.hide(WindowInsetsCompat.Type.systemBars())
+                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
-        }
+        } catch (_: Exception) {}
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } catch (_: Exception) {}
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
@@ -78,32 +84,35 @@ fun App() {
     val message by ProgressState.message.collectAsState()
 
     LaunchedEffect(Unit) {
-        hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
-        val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
+        try {
+            hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
+            val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
 
-        hasShizuku = try {
-            if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
-        } catch (_: Throwable) { false }
+            hasShizuku = try {
+                if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
+            } catch (_: Throwable) { false }
 
-        if (isShizukuInstalled && !hasShizuku) {
-            try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
-        } else if (!isShizukuInstalled) {
-            try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"))) } catch (_: Exception) {}
-        }
+            // Bọc try-catch cực chặt phần xin quyền Shizuku
+            if (isShizukuInstalled && !hasShizuku) {
+                try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
+            } else if (!isShizukuInstalled) {
+                try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"))) } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
     }
 
     fun runOptimize() {
-        if (!hasLQ) {
-            try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.garena.game.kgvn"))) } catch (_: Exception) {}
-            return
-        }
-        if (!hasShizuku) {
-            try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
-            return
-        }
-
-        ProgressState.start()
         try {
+            if (!hasLQ) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.garena.game.kgvn")))
+                return
+            }
+            if (!hasShizuku) {
+                Shizuku.requestPermission(1001)
+                return
+            }
+
+            ProgressState.start()
             val i = Intent(context, OptimizerService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i)
             else context.startService(i)
@@ -117,10 +126,16 @@ fun App() {
 
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CardBg).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE65100)), contentAlignment = Alignment.Center) {
+                // Sử dụng Box chữ 5v5, không dùng file ảnh để chống văng
+                Box(
+                    Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE65100)), 
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("5v5", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
                 }
+                
                 Spacer(Modifier.width(12.dp))
+                
                 Column {
                     Text("Liên Quân Mobile", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text("com.garena.game.kgvn", color = TextGray, fontSize = 13.sp)
