@@ -1,200 +1,245 @@
 package com.apex.lqserver
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 
-val BgDark    = Color(0xFF141414)
-val CardBg    = Color(0xFF1C1C1E)
-val PurpleBtn = Color(0xFFD0BCFF)
-val TextWhite = Color(0xFFEEEEEE)
-val TextGray  = Color(0xFF888888)
-val RedColor  = Color(0xFFFF5252)
+class MainActivity : ComponentActivity() {
 
-class MainActivity : AppCompatActivity() {
-    private val requestNotifPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    private val shizukuGranted = mutableStateOf(false)
+
+    private val shizukuPermissionListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == SHIZUKU_PERMISSION_REQUEST_CODE) {
+                shizukuGranted.value = grantResult == PackageManager.PERMISSION_GRANTED
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-        } catch (_: Exception) {}
 
+        requestNotificationPermissionIfNeeded()
+        
+        // Bọc try-catch để không văng app nếu Shizuku lỗi
         try {
-            setContent {
-                MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
-                    App()
-                }
-            }
-        } catch (e: Throwable) {
+            Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+            requestShizukuPermission()
+        } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        setContent {
+            LQServerFixerTheme {
+                MainScreen(
+                    shizukuGranted = shizukuGranted.value,
+                    onBackClick = { finish() },
+                    onOptimizeClick = {
+                        if (!shizukuGranted.value) {
+                            try { requestShizukuPermission() } catch (e: Exception) { }
+                        } else {
+                            startOptimizerService()
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        } catch (e: Exception) { }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
+            }
+        }
+    }
+
+    private fun requestShizukuPermission() {
+        if (!isShizukuInstalled()) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")))
+            } catch (_: Exception) { }
+            return
+        }
+
+        if (Shizuku.isPreV11() || !Shizuku.pingBinder()) {
+            Toast.makeText(this, "Shizuku chưa chạy. Vui lòng khởi động Shizuku!", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            shizukuGranted.value = true
+        } else {
+            Shizuku.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
+        }
+    }
+
+    private fun isShizukuInstalled(): Boolean = try {
+        packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    private fun startOptimizerService() {
+        val intent = Intent(this, OptimizerService::class.java)
+        ContextCompat.startForegroundService(this, intent)
+    }
+
+    companion object {
+        private const val SHIZUKU_PERMISSION_REQUEST_CODE = 1001
     }
 }
 
 @Composable
-fun App() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var hasShizuku by remember { mutableStateOf(false) }
-    var hasLQ by remember { mutableStateOf(false) }
-    
-    val isRunning by ProgressState.isRunning.collectAsState()
-    val progress by ProgressState.progress.collectAsState()
-    val message by ProgressState.message.collectAsState()
+fun LQServerFixerTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            background = Color(0xFF141414),
+            surface = Color(0xFF1C1C1E),
+            primary = Color(0xFFD0BCFF),
+            onBackground = Color.White,
+            onSurface = Color.White
+        ),
+        content = content
+    )
+}
 
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            try {
-                hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
-                val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
+@Composable
+fun MainScreen(
+    shizukuGranted: Boolean,
+    onBackClick: () -> Unit,
+    onOptimizeClick: () -> Unit
+) {
+    // Dùng collectAsState() thay vì collectAsStateWithLifecycle() để tránh lỗi thư viện
+    val progressState by OptimizerService.progressFlow.collectAsState()
 
-                hasShizuku = try {
-                    if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
-                } catch (_: Throwable) { false }
-
-                if (isShizukuInstalled && !hasShizuku) {
-                    try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun runOptimize() {
-        try {
-            if (!hasLQ) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.garena.game.kgvn")))
-                return
-            }
-            if (!hasShizuku) {
-                scope.launch(Dispatchers.IO) {
-                    try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
-                }
-                return
-            }
-            ProgressState.start()
-            val i = Intent(context, OptimizerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i)
-            else context.startService(i)
-        } catch (_: Exception) { ProgressState.reset() }
-    }
-
-    Column(Modifier.fillMaxSize().background(BgDark).padding(16.dp)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-            Text("<", color = TextWhite, fontSize = 24.sp, fontWeight = FontWeight.Light)
-        }
-
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CardBg).padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE65100)), contentAlignment = Alignment.Center) {
-                    Text("5v5", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Liên Quân Mobile", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text("com.garena.game.kgvn", color = TextGray, fontSize = 13.sp)
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            val lines = listOf(
-                "• Fix Lag Siêu Mượt (Còn 1,3GB)",
-                "• Chơi được đấu thường, rank, đỉnh cao, 3v3",
-                "• Nền sảnh, tổ đội",
-                "• Sử dụng map gốc",
-                "• Có cấu hình cao",
-                "• Không avt",
-                "• Có emote",
-                "• Có skin (Ko mod)",
-                "• Có âm thanh chiêu thức",
-                "• Xoá chi tiết tướng và quái",
-                "• Không các hiệu ứng đổ(ảo choàng băng...)"
-            )
-            
-            lines.forEach { line ->
-                Text(text = line, color = TextWhite, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(vertical = 2.dp))
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Text("✖ Mỗi bản update chỉ optimize 1 lần.", color = RedColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        if (isRunning) {
-            Text("$message ($progress%)", color = PurpleBtn, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), textAlign = TextAlign.Center)
-        }
-
-        if (!hasShizuku || !hasLQ) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                if (!hasShizuku) {
-                    Text("⚠ Chưa cấp quyền Shizuku - Bấm Optimize để cấp", color = RedColor, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                }
-                if (!hasLQ) {
-                    Text("⚠ Chưa cài Liên Quân Mobile", color = RedColor, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-
-        Box(
-            Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(30.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = if (isRunning) listOf(Color(0xFF888888), Color(0xFF555555)) else listOf(PurpleBtn, PurpleBtn)
-                    )
-                )
-                .clickable(enabled = !isRunning) { runOptimize() },
-            contentAlignment = Alignment.Center
+    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF141414)) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 4.dp, bottom = 16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (isRunning) "$progress%" else "Optimize",
-                    color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(56.dp).background(Color(0xFFFF7A00), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("5v5", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text("Liên Quân Mobile", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("com.garena.game.kgvn", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
+                    val features = listOf(
+                        "• Fix Lag Siêu Mượt (Còn 1,3GB)",
+                        "• Chơi được đấu thường, rank, đỉnh cao, 3v3",
+                        "• Nền sảnh, tổ đội",
+                        "• Sử dụng map gốc",
+                        "• Có cấu hình cao",
+                        "• Không avt",
+                        "• Có emote",
+                        "• Có skin (Ko mod)",
+                        "• Có âm thanh chiêu thức",
+                        "• Xoá chi tiết tướng và quái",
+                        "• Không các hiệu ứng đổ(ảo choàng băng...)"
+                    )
+                    features.forEach { Text(it, color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(vertical = 4.dp)) }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("✖ Mỗi bản update chỉ optimize 1 lần.", color = Color(0xFFFF4444), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+                    when (val s = progressState) {
+                        is ProgressState.Completed -> Text("✅ Tối ưu hoàn tất! Hãy mở lại game.", color = Color(0xFF4CAF50), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                        is ProgressState.Error -> Text("❌ Lỗi: ${s.message}", color = Color(0xFFFF4444), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                        else -> {}
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val running = progressState as? ProgressState.Running
+            val isRunning = running != null
+
+            Button(
+                onClick = onOptimizeClick,
+                enabled = !isRunning,
+                modifier = Modifier.fillMaxWidth().height(72.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRunning) Color.Gray else Color(0xFFD0BCFF),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color.Gray,
+                    disabledContentColor = Color.White
                 )
-                if (!isRunning) {
-                    Spacer(Modifier.width(8.dp))
-                    Text("▶", color = Color.White.copy(alpha = 0.7f), fontSize = 16.sp)
+            ) {
+                if (isRunning) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Đang tối ưu... ${running!!.percent}%", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(progress = running.percent / 100f, modifier = Modifier.fillMaxWidth(0.85f), color = Color(0xFFD0BCFF), trackColor = Color.DarkGray)
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (shizukuGranted) "Optimize" else "Cấp quyền Shizuku", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
