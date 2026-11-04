@@ -33,12 +33,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import rikka.shizuku.Shizuku
 
-val BgDark    = Color(0xFF141414)
-val CardBg    = Color(0xFF1C1C1E)
+val BgDark = Color(0xFF141414)
+val CardBg = Color(0xFF1C1C1E)
 val PurpleBtn = Color(0xFFD0BCFF)
 val TextWhite = Color(0xFFEEEEEE)
-val TextGray  = Color(0xFF888888)
-val RedColor  = Color(0xFFFF5252)
+val TextGray = Color(0xFF888888)
+val RedColor = Color(0xFFFF5252)
 
 class MainActivity : ComponentActivity() {
     private val requestNotifPermission = registerForActivityResult(
@@ -47,8 +47,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // BỌC TRY-CATCH TOÀN BỘ PHẦN KHỞI TẠO
         try {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             WindowInsetsControllerCompat(window, window.decorView).let {
@@ -57,22 +55,16 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: Exception) {}
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-        } catch (_: Exception) {}
+        }
 
-        try {
-            setContent {
-                MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
-                    App()
-                }
+        setContent {
+            MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
+                App()
             }
-        } catch (e: Throwable) {
-            e.printStackTrace()
         }
     }
 }
@@ -87,9 +79,8 @@ fun App() {
     val progress by ProgressState.progress.collectAsState()
     val message by ProgressState.message.collectAsState()
 
-    // DÙNG runCatching ĐỂ CHỐNG CRASH KHI CHECK SHIZUKU
     LaunchedEffect(Unit) {
-        runCatching {
+        try {
             hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
             val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
 
@@ -100,7 +91,7 @@ fun App() {
             if (isShizukuInstalled && !hasShizuku) {
                 try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
             }
-        }
+        } catch (_: Exception) {}
     }
 
     fun runOptimize() {
