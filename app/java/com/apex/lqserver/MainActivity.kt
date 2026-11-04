@@ -155,7 +155,7 @@ fun App() {
                 "• Có skin (Ko mod)",
                 "• Có âm thanh chiêu thức",
                 "• Xoá chi tiết tướng và quái",
-                "• Không các hiệu ứng đổ(ảo choàng băng...)"
+                "• Không các hiệu ứng (ảo choàng băng...)"
             )
             
             lines.forEach { line ->
