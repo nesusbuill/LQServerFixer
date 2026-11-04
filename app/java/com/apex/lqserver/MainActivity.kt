@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // BỌC TRY-CATCH TOÀN BỘ PHẦN KHỞI TẠO
         try {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             WindowInsetsControllerCompat(window, window.decorView).let {
@@ -63,10 +65,14 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: Exception) {}
 
-        setContent {
-            MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
-                App()
+        try {
+            setContent {
+                MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
+                    App()
+                }
             }
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
     }
 }
@@ -81,8 +87,9 @@ fun App() {
     val progress by ProgressState.progress.collectAsState()
     val message by ProgressState.message.collectAsState()
 
+    // DÙNG runCatching ĐỂ CHỐNG CRASH KHI CHECK SHIZUKU
     LaunchedEffect(Unit) {
-        try {
+        runCatching {
             hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
             val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
 
@@ -93,7 +100,7 @@ fun App() {
             if (isShizukuInstalled && !hasShizuku) {
                 try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
             }
-        } catch (_: Exception) {}
+        }
     }
 
     fun runOptimize() {
