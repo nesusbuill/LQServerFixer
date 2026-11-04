@@ -33,8 +33,10 @@ jobs:
       - name: Build APK Release
         run: gradle assembleRelease
 
-      - name: Upload APK lên Github (QUAN TRỌNG NHẤT)
+      # BƯỚC QUAN TRỌNG: Tự động tìm mọi file .apk trong thư mục output
+      - name: Upload APK lên Github
         uses: actions/upload-artifact@v4
         with:
           name: LQ-Server-Fixer-APK
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error  # Báo lỗi rõ ràng nếu không tìm thấy file
