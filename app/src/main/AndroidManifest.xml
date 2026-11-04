@@ -2,13 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- QUYỀN CƠ BẢN -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- QUYỀN SHIZUKU -->
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
@@ -17,12 +14,12 @@
         <package android:name="com.garena.game.kgvn" />
     </queries>
 
-    <!-- THEME CHUẨN ĐỂ KHÔNG VĂNG -->
     <application
         android:label="LQ Server Fixer"
+        android:icon="@drawable/ic_launcher_custom"
         android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
         android:allowBackup="false"
-        tools:replace="android:theme">
+        tools:replace="android:theme,android:icon">
 
         <meta-data
             android:name="moe.shizuku.client.V3_SUPPORT"
@@ -47,13 +44,6 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="game_fix" />
         </service>
 
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"
-            tools:replace="android:authorities" />
+        <!-- ĐÃ XÓA PROVIDER CỦA SHIZUKU ĐỂ KHÔNG BỊ VĂNG APP -->
     </application>
 </manifest>
