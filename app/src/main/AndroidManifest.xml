@@ -2,15 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Quyền Hệ thống & Shizuku -->
+    <!-- ===== QUYỀN SHIZUKU & HỆ THỐNG ===== -->
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
+        tools:ignore="QueryAllPackagesPermission" />
     
-    <!-- QUYỀN TRUY CẬP BỘ NHỚ (Để hiện cảnh báo của Android) -->
+    <!-- ===== QUYỀN BỘ NHỚ CHO MỌI ANDROID ===== -->
+    <!-- Android 10 trở xuống -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- Android 11 trở lên (Quyền truy cập tất cả file - hiện bảng cảnh báo) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
-    
-    <!-- Quyền Mạng & Service -->
+
+    <!-- ===== QUYỀN MẠNG & SERVICE ===== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -23,10 +28,11 @@
         android:label="LQ Server Fixer"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.LQServerFixer"
         android:requestLegacyExternalStorage="true"
+        android:theme="@style/Theme.LQServerFixer"
         tools:targetApi="34">
 
+        <!-- Shizuku V3 -->
         <meta-data
             android:name="moe.shizuku.client.V3_SUPPORT"
             android:value="true"
@@ -40,6 +46,7 @@
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
+        <!-- Màn hình chính -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -51,6 +58,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Service chạy ngầm (Chuẩn Android 14) -->
         <service
             android:name=".OptimizerService"
             android:enabled="true"
