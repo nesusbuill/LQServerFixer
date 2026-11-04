@@ -18,6 +18,24 @@ android {
         }
     }
 
+    // BẮT BUỘC PHẢI CÓ ĐỂ TẠO FILE SIGNED
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "123456"
+            keyAlias "lqserver"
+            keyPassword "123456"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // LIÊN KẾT VỚI KEYSTORE
+            signingConfig signingConfigs.release
+        }
+    }
+
     buildFeatures { compose true }
     composeOptions { kotlinCompilerExtensionVersion '1.5.4' }
     compileOptions {
