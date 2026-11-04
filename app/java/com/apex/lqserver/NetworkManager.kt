@@ -5,8 +5,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object NetworkManager {
-    // SẾP THAY LINK GITHUB GIST RAW VÀO ĐÂY
-    private const val CONFIG_URL = "https://gist.githubusercontent.com/username/id/raw/rules.json"
+    // ĐÃ THAY LINK RAW TỪ GIST CỦA SẾP
+    private const val CONFIG_URL = "https://gist.githubusercontent.com/nesusbuill/47438ecc83d6e224dd8e993009f8daf5/raw/rules.json"
 
     fun fetchRules(): List<String> {
         // Danh sách mặc định phòng trường hợp rớt mạng không lấy được luật mới
