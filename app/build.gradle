@@ -17,17 +17,17 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: "release.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "lqserver123"
-            keyAlias System.getenv("KEY_ALIAS") ?: "lqserver"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "lqserver123"
+            // Dùng rootProject.file để trỏ thẳng ra thư mục gốc của Github
+            storeFile rootProject.file("release.keystore")
+            storePassword "lqserver123"
+            keyAlias "lqserver"
+            keyPassword "lqserver123"
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            // BỎ DÒNG proguardFiles getDefault... ĐỂ KHÔNG CẦN TẠO FILE
             signingConfig signingConfigs.release
         }
     }
