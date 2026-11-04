@@ -6,9 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,7 +40,7 @@ val TextWhite = Color(0xFFEEEEEE)
 val TextGray  = Color(0xFF888888)
 val RedColor  = Color(0xFFFF5252)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val requestNotifPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
@@ -48,17 +48,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Không dùng WindowCompat để tránh lỗi trên một số dòng máy
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
-        }
+        } catch (_: Exception) {}
 
-        setContent {
-            MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
-                App()
+        try {
+            setContent {
+                MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
+                    App()
+                }
             }
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
     }
 }
@@ -74,7 +79,6 @@ fun App() {
     val progress by ProgressState.progress.collectAsState()
     val message by ProgressState.message.collectAsState()
 
-    // Đưa logic check Shizuku vào Background Thread để không block UI
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
