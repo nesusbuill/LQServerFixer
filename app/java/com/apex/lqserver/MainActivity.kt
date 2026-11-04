@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,19 +48,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Xin quyền tự động khi mở App
-        checkAndRequestPermissions()
-
         try {
             Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
-            requestShizukuPermission()
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e("MainActivity", "Lỗi khởi tạo Shizuku", e)
         }
 
-        setContent {
-            LQServerFixerTheme {
-                try {
+        try {
+            setContent {
+                LQServerFixerTheme {
+                    // Gọi xin quyền SAU KHI giao diện đã vẽ xong
+                    LaunchedEffect(Unit) {
+                        requestAllPermissions()
+                    }
+                    
                     MainScreen(
                         shizukuGranted = shizukuGranted.value,
                         onBackClick = { finish() },
@@ -74,56 +76,61 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
-                } catch (e: Throwable) {
-                    // Bắt lỗi UI (chống văng)
-                    Column(
-                        modifier = Modifier.fillMaxSize().background(Color.Red).padding(16.dp),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("LỖI UI: ${e.message}", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(e.stackTraceToString(), color = Color.White, fontSize = 10.sp)
-                    }
                 }
             }
+        } catch (e: Throwable) {
+            // NẾU COMPOSE LỖI, HIỆN MÀN HÌNH ĐỎ BÁO LỖI THAY VÌ VĂNG APP
+            Log.e("MainActivity", "Compose Crash", e)
+            val tv = android.widget.TextView(this).apply {
+                text = "LỖI KHỞI TẠO GIAO DIỆN:\n\n${e.message}\n\n${e.stackTraceToString()}"
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundColor(android.graphics.Color.RED)
+                setPadding(32, 32, 32, 32)
+                textSize = 12f
+            }
+            setContentView(tv)
         }
     }
 
-    // Hàm tự động xin quyền cho mọi Android
-    private fun checkAndRequestPermissions() {
-        // 1. Android 13+ (Xin quyền Thông báo)
+    private fun requestAllPermissions() {
+        // 1. Android 13+ (Thông báo)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
             }
         }
 
-        // 2. Android 6 đến 10 (Xin quyền Bộ nhớ thường)
+        // 2. Android 6 - 10 (Bộ nhớ thường)
         if (Build.VERSION.SDK_INT in Build.VERSION_CODES.M..Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, android.Manifest.permission.READ_EXTERNAL_STORAGE), 1003)
             }
         }
 
-        // 3. Android 11+ (Xin quyền Truy cập tất cả file - Hiện cảnh báo)
+        // 3. Android 11+ (Quyền tất cả file)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 openAllFilesAccessSettings()
             }
         }
+
+        // 4. Xin quyền Shizuku
+        requestShizukuPermission()
     }
 
-    // Mở bảng cài đặt xin quyền "Tất cả file"
     private fun openAllFilesAccessSettings() {
         try {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
             intent.addCategory("android.intent.category.DEFAULT")
             intent.data = Uri.parse("package:$packageName")
             startActivity(intent)
-            Toast.makeText(this, "Vui lòng cấp quyền 'Truy cập tất cả file' để tối ưu!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Vui lòng cấp quyền 'Truy cập tất cả file'!", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
-            // Fallback nếu máy không hỗ trợ
-            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-            startActivity(intent)
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            } catch (ex: Exception) {
+                Log.e("MainActivity", "Không thể mở Settings", ex)
+            }
         }
     }
 
@@ -150,7 +157,7 @@ class MainActivity : ComponentActivity() {
                 Shizuku.requestPermission(1001)
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e("MainActivity", "Lỗi xin quyền Shizuku", e)
         }
     }
 
