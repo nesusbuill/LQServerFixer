@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,8 +48,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Bọc try-catch chống văng màn hình
         try {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             WindowInsetsControllerCompat(window, window.decorView).let {
@@ -57,13 +56,11 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: Exception) {}
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-        } catch (_: Exception) {}
+        }
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = BgDark)) {
@@ -78,12 +75,13 @@ fun App() {
     val context = LocalContext.current
     var hasShizuku by remember { mutableStateOf(false) }
     var hasLQ by remember { mutableStateOf(false) }
+    var isAccessibilityEnabled by remember { mutableStateOf(false) }
     
     val isRunning by ProgressState.isRunning.collectAsState()
     val progress by ProgressState.progress.collectAsState()
     val message by ProgressState.message.collectAsState()
 
-    LaunchedEffect(Unit) {
+    fun checkStatus() {
         try {
             hasLQ = try { context.packageManager.getPackageInfo("com.garena.game.kgvn", 0) != null } catch (_: Exception) { false }
             val isShizukuInstalled = try { context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null } catch (_: Exception) { false }
@@ -92,7 +90,10 @@ fun App() {
                 if (isShizukuInstalled) Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED else false
             } catch (_: Throwable) { false }
 
-            // Bọc try-catch cực chặt phần xin quyền Shizuku
+            val service = "${context.packageName}/${AutoDownloadService::class.java.name}"
+            val enabledServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            isAccessibilityEnabled = enabledServices?.contains(service) == true
+
             if (isShizukuInstalled && !hasShizuku) {
                 try { Shizuku.requestPermission(1001) } catch (_: Throwable) {}
             } else if (!isShizukuInstalled) {
@@ -100,6 +101,9 @@ fun App() {
             }
         } catch (_: Exception) {}
     }
+
+    LaunchedEffect(Unit) { checkStatus() }
+    LaunchedEffect(isRunning) { if (!isRunning) checkStatus() }
 
     fun runOptimize() {
         try {
@@ -111,12 +115,22 @@ fun App() {
                 Shizuku.requestPermission(1001)
                 return
             }
-
             ProgressState.start()
             val i = Intent(context, OptimizerService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i)
             else context.startService(i)
         } catch (_: Exception) { ProgressState.reset() }
+    }
+
+    fun openAutoDownload() {
+        if (!isAccessibilityEnabled) {
+            try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) {}
+        } else {
+            try {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage("com.garena.game.kgvn")
+                context.startActivity(launchIntent)
+            } catch (_: Exception) {}
+        }
     }
 
     Column(Modifier.fillMaxSize().background(BgDark).padding(16.dp)) {
@@ -126,16 +140,10 @@ fun App() {
 
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CardBg).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Sử dụng Box chữ 5v5, không dùng file ảnh để chống văng
-                Box(
-                    Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE65100)), 
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE65100)), contentAlignment = Alignment.Center) {
                     Text("5v5", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
                 }
-                
                 Spacer(Modifier.width(12.dp))
-                
                 Column {
                     Text("Liên Quân Mobile", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text("com.garena.game.kgvn", color = TextGray, fontSize = 13.sp)
@@ -155,7 +163,7 @@ fun App() {
                 "• Có skin (Ko mod)",
                 "• Có âm thanh chiêu thức",
                 "• Xoá chi tiết tướng và quái",
-                "• Không các hiệu ứng (ảo choàng băng...)"
+                "• Không các hiệu ứng đổ(ảo choàng băng...)"
             )
             
             lines.forEach { line ->
@@ -174,6 +182,22 @@ fun App() {
         }
 
         Box(
+            Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(25.dp))
+                .background(if (isAccessibilityEnabled) Color(0xFF2196F3).copy(alpha = 0.2f) else CardBg)
+                .clickable { openAutoDownload() }
+                .padding(bottom = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isAccessibilityEnabled) "MỞ GAME ĐỂ TỰ ĐỘNG TẢI FULL" else "BẬT TRỢ NĂNG ĐỂ TỰ ĐỘNG TẢI",
+                color = if (isAccessibilityEnabled) Color(0xFF2196F3) else TextGray,
+                fontWeight = FontWeight.Bold, fontSize = 12.sp
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Box(
             Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(30.dp))
                 .background(
                     Brush.horizontalGradient(
@@ -185,8 +209,8 @@ fun App() {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (isRunning) "$progress%" else "Optimize",
-                    color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp
+                    text = if (isRunning) "$progress%" else "Optimize (Ép 1.3GB)",
+                    color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp
                 )
                 if (!isRunning) {
                     Spacer(Modifier.width(8.dp))
