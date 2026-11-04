@@ -38,23 +38,18 @@ class MainActivity : ComponentActivity() {
         Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
             if (requestCode == 1001) {
                 shizukuGranted.value = grantResult == PackageManager.PERMISSION_GRANTED
+                if (shizukuGranted.value) {
+                    Toast.makeText(this, "Đã cấp quyền Shizuku!", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Xin quyền thông báo (Android 13+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
-            }
-        }
+        // Xin quyền tự động khi mở App
+        checkAndRequestPermissions()
 
-        // 2. Xin quyền truy cập bộ nhớ (Cảnh báo của Android)
-        checkStoragePermission()
-
-        // 3. Kết nối Shizuku
         try {
             Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
             requestShizukuPermission()
@@ -64,40 +59,71 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LQServerFixerTheme {
-                MainScreen(
-                    shizukuGranted = shizukuGranted.value,
-                    onBackClick = { finish() },
-                    onOptimizeClick = {
-                        if (!shizukuGranted.value) {
-                            try { requestShizukuPermission() } catch (e: Throwable) { }
-                        } else if (!Environment.isExternalStorageManager()) {
-                            // Bắt buộc phải có quyền bộ nhớ mới cho chạy
-                            checkStoragePermission()
-                            Toast.makeText(this@MainActivity, "Cần cấp quyền truy cập bộ nhớ!", Toast.LENGTH_SHORT).show()
-                        } else {
-                            val intent = Intent(this@MainActivity, OptimizerService::class.java)
-                            ContextCompat.startForegroundService(this@MainActivity, intent)
+                try {
+                    MainScreen(
+                        shizukuGranted = shizukuGranted.value,
+                        onBackClick = { finish() },
+                        onOptimizeClick = {
+                            if (!shizukuGranted.value) {
+                                try { requestShizukuPermission() } catch (e: Throwable) { }
+                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                                openAllFilesAccessSettings()
+                            } else {
+                                val intent = Intent(this@MainActivity, OptimizerService::class.java)
+                                ContextCompat.startForegroundService(this@MainActivity, intent)
+                            }
                         }
+                    )
+                } catch (e: Throwable) {
+                    // Bắt lỗi UI (chống văng)
+                    Column(
+                        modifier = Modifier.fillMaxSize().background(Color.Red).padding(16.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("LỖI UI: ${e.message}", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(e.stackTraceToString(), color = Color.White, fontSize = 10.sp)
                     }
-                )
+                }
             }
         }
     }
 
-    // Hàm xin quyền bộ nhớ (Hiện cảnh báo Android)
-    private fun checkStoragePermission() {
+    // Hàm tự động xin quyền cho mọi Android
+    private fun checkAndRequestPermissions() {
+        // 1. Android 13+ (Xin quyền Thông báo)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
+            }
+        }
+
+        // 2. Android 6 đến 10 (Xin quyền Bộ nhớ thường)
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.M..Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, android.Manifest.permission.READ_EXTERNAL_STORAGE), 1003)
+            }
+        }
+
+        // 3. Android 11+ (Xin quyền Truy cập tất cả file - Hiện cảnh báo)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
-                try {
-                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                    intent.addCategory("android.intent.category.DEFAULT")
-                    intent.data = Uri.parse("package:$packageName")
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                    startActivity(intent)
-                }
+                openAllFilesAccessSettings()
             }
+        }
+    }
+
+    // Mở bảng cài đặt xin quyền "Tất cả file"
+    private fun openAllFilesAccessSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+            intent.addCategory("android.intent.category.DEFAULT")
+            intent.data = Uri.parse("package:$packageName")
+            startActivity(intent)
+            Toast.makeText(this, "Vui lòng cấp quyền 'Truy cập tất cả file' để tối ưu!", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // Fallback nếu máy không hỗ trợ
+            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+            startActivity(intent)
         }
     }
 
@@ -157,9 +183,7 @@ fun MainScreen(
     val progressState by OptimizerService.progressFlow.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF141414)) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
